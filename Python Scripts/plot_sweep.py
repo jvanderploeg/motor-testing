@@ -1,3 +1,4 @@
+import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
@@ -7,10 +8,10 @@ import scipy.optimize as opt
 # USER CONFIGURATION
 # ============================================================
 
-# MVP File
-#file = "./full range motor sn0020.csv"
-#BK File
-file = "./RampTest_2024-07-21_144641.csv"
+_parser = argparse.ArgumentParser(description="Analyze motor sweep/ramp test data.")
+_parser.add_argument("file", help="Path to the ramp/sweep test CSV data file")
+_args = _parser.parse_args()
+file = _args.file
 
 # Propeller specifications
 PROP_DIAMETER_INCHES = 6.0  # Propeller diameter in inches

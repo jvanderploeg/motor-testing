@@ -26,7 +26,6 @@ The scripts process CSV data files exported from motor test stands to calculate:
 
 **Configuration (edit at top of file):**
 ```python
-file = "./RampTest_2024-07-21_144641.csv"  # Input CSV file
 PROP_DIAMETER_INCHES = 6.0                 # Propeller diameter
 PROP_PITCH_INCHES = 3.0                    # Propeller pitch
 MOTOR_KV = 2300                            # Motor KV rating
@@ -38,7 +37,11 @@ MOT_PWM_MAX = 1900                         # ArduPilot MOT_PWM_MAX
 
 **Usage:**
 ```powershell
-python ".\Python Scripts\plot_sweep.py"
+python ".\Python Scripts\plot_sweep.py" <path_to_csv>
+```
+**Example:**
+```powershell
+python ".\Python Scripts\plot_sweep.py" ".\Sample CSVs\BK_RampTest_2024-07-21_144641.csv"
 ```
 
 **Outputs:**
@@ -65,14 +68,17 @@ python ".\Python Scripts\plot_sweep.py"
 
 **Configuration (edit at top of file):**
 ```python
-STEP_FILE = "./StepsTestV2_2024-07-16_164339.csv"  # Input file
 MIN_STEP_SIZE = 30         # Minimum step size to detect (µs)
 SETTLING_THRESHOLD = 0.95  # 95% settling criterion
 ```
 
 **Usage:**
 ```powershell
-python ".\Python Scripts\analyze_step_response.py"
+python ".\Python Scripts\analyze_step_response.py" <path_to_csv>
+```
+**Example:**
+```powershell
+python ".\Python Scripts\analyze_step_response.py" ".\Sample CSVs\StepsTestV2_2024-07-16_164339.csv"
 ```
 
 **Outputs:**
@@ -96,14 +102,13 @@ python ".\Python Scripts\analyze_step_response.py"
 - Provides PID tuning recommendations for cascaded control loops
 - Checks for throttle-dependent dynamics
 
-**Configuration (edit at top of file):**
-```python
-DATA_FILE = "./90PERCENT_2024-08-13_185523.csv"  # Input file
-```
-
 **Usage:**
 ```powershell
-python ".\Python Scripts\extract_motor_dynamics.py"
+python ".\Python Scripts\extract_motor_dynamics.py" <path_to_csv>
+```
+**Example:**
+```powershell
+python ".\Python Scripts\extract_motor_dynamics.py" ".\Sample CSVs\90PERCENT_2024-08-13_185523.csv"
 ```
 
 **Outputs:**
@@ -206,11 +211,11 @@ This gives you:
 ### 2. Dynamic Response Analysis (Step Test)
 Run a **step response test** with various throttle steps:
 ```powershell
-python ".\Python Scripts\analyze_step_response.py"
+python ".\Python Scripts\analyze_step_response.py" your_step_test.csv
 ```
 or
 ```powershell
-python ".\Python Scripts\extract_motor_dynamics.py"
+python ".\Python Scripts\extract_motor_dynamics.py" your_step_test.csv
 ```
 This gives you:
 - Motor time constant (τ)
@@ -285,7 +290,7 @@ The `Sample CSVs/` folder contains example data from various motor tests. Use th
 
 ## Notes
 
-- All scripts have configuration sections at the top - edit these before running
+- `analyze_step_response.py`, `extract_motor_dynamics.py`, and `plot_sweep.py` accept the input CSV as a command-line argument; other scripts still have configuration sections at the top
 - Most scripts generate plots that must be closed to return to terminal
 - CSV files are assumed to be in the same directory or provide full/relative path
 - Scripts are designed for Windows (PowerShell) but work on any platform with Python

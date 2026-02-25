@@ -3,21 +3,32 @@ Extract Motor Time Constant from Step Response Data
 Works with both pre-computed settling times and raw transient data
 """
 
+import argparse
+import io
+import os
+import sys
 import numpy as np
 import polars as pl
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
+from datetime import datetime
 
-# ============================================================
-# CONFIGURATION
-# ============================================================
 
-# Data file with step response tests
-# Use the file with high-rate time-series data
-DATA_FILE = "./90PERCENT_2024-08-13_185523.csv"
+class _Tee:
+    """Mirrors writes to both the real stdout and an internal StringIO buffer."""
+    def __init__(self, real_stdout):
+        self._real = real_stdout
+        self._buf = io.StringIO()
 
-# Alternative: If you have raw time-series data without pre-computed metrics
-# DATA_FILE = "./your_raw_step_test.csv"
+    def write(self, data):
+        self._real.write(data)
+        self._buf.write(data)
+
+    def flush(self):
+        self._real.flush()
+
+    def getvalue(self):
+        return self._buf.getvalue()
 
 # ============================================================
 # ANALYSIS
@@ -222,56 +233,104 @@ def analyze_from_transients(df):
     
     return tau_median
 
+def _save_report(report_text, data_file, generated_at):
+    """
+    Write *report_text* to  <repo_root>/Reports/<csv_stem>_YYYYMMDD_HHMMSS.txt
+    Creates the Reports directory if it does not exist.
+    """
+    csv_stem = os.path.splitext(os.path.basename(data_file))[0]
+    timestamp = generated_at.strftime("%Y%m%d_%H%M%S")
+    report_name = f"{csv_stem}_{timestamp}.txt"
+
+    # Place Reports/ one level above the Python Scripts/ directory
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    reports_dir = os.path.join(os.path.dirname(script_dir), "Reports")
+    os.makedirs(reports_dir, exist_ok=True)
+
+    report_path = os.path.join(reports_dir, report_name)
+
+    header = (
+        "=" * 60 + "\n"
+        "MOTOR DYNAMICS ANALYSIS REPORT\n"
+        f"Generated : {generated_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
+        f"Source CSV: {os.path.basename(data_file)}\n"
+        "=" * 60 + "\n\n"
+    )
+
+    with open(report_path, "w", encoding="utf-8") as fh:
+        fh.write(header)
+        fh.write(report_text)
+
+    print(f"\nReport saved: {report_path}")
+
+
 def main():
     """Main analysis workflow"""
-    
-    print("="*60)
-    print("MOTOR TIME CONSTANT EXTRACTION")
-    print("="*60)
-    print(f"\nInput file: {DATA_FILE}")
-    
-    # Load data
-    df = pl.read_csv(DATA_FILE)
-    
-    print(f"Columns found: {df.columns}")
-    
-    # Check which type of analysis to use
-    has_settling_time = "90% settling time (s)" in df.columns
-    has_time_series = "Time (s)" in df.columns and len(df) > 20
-    
-    tau_result = None
-    
-    if has_settling_time:
-        print("\n✓ Found pre-computed settling time data")
-        tau_result = analyze_with_settling_times(df)
-    elif has_time_series:
-        print("\n✓ Found time-series data - will fit transients")
-        tau_result = analyze_from_transients(df)
-    else:
-        print("\n✗ Data format not recognized!")
-        print("  Need either:")
-        print("    - Column '90% settling time (s)' with pre-computed values")
-        print("    - High-rate time series data with 'Time (s)' and 'Thrust (N)'")
-        return
-    
-    if tau_result is not None:
-        # Final recommendation
-        bw_hz = 1 / (2 * np.pi * tau_result)
-        safe_bw = bw_hz / 4
-        
-        print(f"\n" + "="*60)
-        print("CONFIGURATION RECOMMENDATION")
+
+    parser = argparse.ArgumentParser(description="Extract motor time constant from step response data.")
+    parser.add_argument("file", help="Path to the step response CSV data file")
+    args = parser.parse_args()
+
+    data_file = args.file
+    generated_at = datetime.now()
+
+    # Tee stdout so everything printed below is also captured for the report
+    tee = _Tee(sys.stdout)
+    sys.stdout = tee
+
+    try:
         print("="*60)
-        print(f"\nAdd to vehicle config JSON:")
-        print(f'  "motor_time_constant": {tau_result:.4f},  // {tau_result*1000:.1f} ms')
-        print(f'  "actuator_bandwidth_hz": {bw_hz:.2f},')
-        print(f'  "max_rate_bandwidth_hz": {safe_bw:.1f}  // Safe limit')
+        print("MOTOR TIME CONSTANT EXTRACTION")
+        print("="*60)
+        print(f"\nInput file: {data_file}")
         
-        print(f"\nRecommended PID bandwidths:")
-        print(f"  Rate loop:     {safe_bw*0.8:.1f} Hz  (conservative start)")
-        print(f"  Angle loop:    {safe_bw*0.8/4:.1f} Hz  (4× slower)")
-        print(f"  Velocity loop: {safe_bw*0.8/8:.1f} Hz  (2× slower than angle)")
-        print(f"  Position loop: {safe_bw*0.8/16:.1f} Hz (2× slower than velocity)")
+        # Load data
+        df = pl.read_csv(data_file)
+        
+        print(f"Columns found: {df.columns}")
+        
+        # Check which type of analysis to use
+        has_settling_time = "90% settling time (s)" in df.columns
+        has_time_series = "Time (s)" in df.columns and len(df) > 20
+        
+        tau_result = None
+        
+        if has_settling_time:
+            print("\n✓ Found pre-computed settling time data")
+            tau_result = analyze_with_settling_times(df)
+        elif has_time_series:
+            print("\n✓ Found time-series data - will fit transients")
+            tau_result = analyze_from_transients(df)
+        else:
+            print("\n✗ Data format not recognized!")
+            print("  Need either:")
+            print("    - Column '90% settling time (s)' with pre-computed values")
+            print("    - High-rate time series data with 'Time (s)' and 'Thrust (N)'")
+
+        if tau_result is not None:
+            # Final recommendation
+            bw_hz = 1 / (2 * np.pi * tau_result)
+            safe_bw = bw_hz / 4
+            
+            print(f"\n" + "="*60)
+            print("CONFIGURATION RECOMMENDATION")
+            print("="*60)
+            print(f"\nAdd to vehicle config JSON:")
+            print(f'  "motor_time_constant": {tau_result:.4f},  // {tau_result*1000:.1f} ms')
+            print(f'  "actuator_bandwidth_hz": {bw_hz:.2f},')
+            print(f'  "max_rate_bandwidth_hz": {safe_bw:.1f}  // Safe limit')
+            
+            print(f"\nRecommended PID bandwidths:")
+            print(f"  Rate loop:     {safe_bw*0.8:.1f} Hz  (conservative start)")
+            print(f"  Angle loop:    {safe_bw*0.8/4:.1f} Hz  (4× slower)")
+            print(f"  Velocity loop: {safe_bw*0.8/8:.1f} Hz  (2× slower than angle)")
+            print(f"  Position loop: {safe_bw*0.8/16:.1f} Hz (2× slower than velocity)")
+
+    finally:
+        # Always restore stdout and save the report, even if the plot window
+        # is closed mid-run (KeyboardInterrupt) or an error occurs.
+        sys.stdout = tee._real
+        _save_report(tee.getvalue(), data_file, generated_at)
 
 if __name__ == "__main__":
     main()

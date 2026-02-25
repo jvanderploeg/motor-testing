@@ -3,6 +3,7 @@ Analyze Step Response Data to Extract Motor Time Constant
 Fits exponential response to step changes in throttle
 """
 
+import argparse
 import numpy as np
 import polars as pl
 import matplotlib.pyplot as plt
@@ -12,9 +13,6 @@ from scipy.signal import find_peaks
 # ============================================================
 # USER CONFIGURATION
 # ============================================================
-
-# Step test data file
-STEP_FILE = "./StepsTestV2_2024-07-16_164339.csv"
 
 # Minimum step size to detect (in µs)
 MIN_STEP_SIZE = 30  # Detect steps > 30 µs change
@@ -220,14 +218,20 @@ def plot_step_fits(time, thrust, esc_signal, step_results):
 def main():
     """Main analysis workflow"""
     
+    parser = argparse.ArgumentParser(description="Analyze step response data to extract motor time constant.")
+    parser.add_argument("file", help="Path to the step test CSV data file")
+    args = parser.parse_args()
+
+    step_file = args.file
+
     print("="*60)
     print("Motor Step Response Analysis")
     print("="*60)
     
     # Load data
-    print(f"\nLoading data from: {STEP_FILE}")
+    print(f"\nLoading data from: {step_file}")
     df = pl.read_csv(
-        STEP_FILE,
+        step_file,
         schema_overrides={
             "Time (s)": pl.Float64,
             "ESC signal (µs)": pl.Float64,
